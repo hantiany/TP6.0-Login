@@ -17,26 +17,23 @@ class Login
      */
     public function login(Request $request)
     {
-        $arr=input();
-        $phone=$arr['phone'] ?? null;
-        $token=$arr['token'] ?? null;
-        $code=$arr['code'] ?? null;
-        if(!$phone || !$token || !$code){
-            return response('Internal Server Error',500);
-        }
-        $code1=Cache::store('redis')->get($phone);
+        $arr = input();
+        $phone = $arr['phone'] ?? null;
+        $token = $arr['token'] ?? null;
+        $code = $arr['code'] ?? null;
+        if(!$phone || !$token || !$code) return response('Internal Server Error',500);
+        $code1 = Cache::store('redis')->get($phone);
         //判断验证码
-        if($code!==$code1){
-            return response('Internal Server Error',500);
-        }
+        if($code !== $code1) return response('Internal Server Error',500);
+
         //验证token
-        $res=$this->checkToken($token,$phone);
+        $res = $this->checkToken($token,$phone);
         if($res){
             $arr=[
-                'msg'=>'ok',
-                'code'=>200,
-                'user_id'=>$res['user_id'],
-                'account_num'=>$res['account_num']
+                'msg' => 'ok',
+                'code' => 200,
+                'user_id' => $res['user_id'],
+                'account_num' => $res['account_num']
             ];
             return json_encode($arr);
         }
@@ -57,18 +54,15 @@ class Login
      * @throws \think\db\exception\ModelNotFoundException
      */
     private function checkToken(string $token,string $phone){
-        $key=Env::get('jwt.jwt_key', '');
-        $res=JWT::decode($token,$key,["HS256"]);
-        if(!$res){
-            return response('Internal Server Error',500);
-        }
-        $uid=$res->uid;
-        $user=new User;
-        $info=$user->find($uid);
+        $key = Env::get('jwt.jwt_key', '');
+        $res = JWT::decode($token,$key,["HS256"]);
+        if(!$res) return response('Internal Server Error',500);
+        $uid = $res->uid;
+        $user = new User;
+        $info = $user->find($uid);
+
         //验证token成功，返回用户信息
-        if($info['account_num']==$phone){
-            return $info->toArray();
-        }
+        if($info['account_num']==$phone) return $info->toArray();
         return false;
     }
 
@@ -78,18 +72,16 @@ class Login
      * @throws \Psr\SimpleCache\InvalidArgumentException
      */
     public function registerDo(Request $request){
-        $phone=$request->post('phone');
-        $code=$request->post('code');
-        if(!$phone || !$code){
-            return response('Internal Server Error',500);
-        }
+        $phone = $request->post('phone');
+        $code = $request->post('code');
+        if(!$phone || !$code) return response('Internal Server Error',500);
+
         //缓存中取出验证码并验证
-        $code1=Cache::store('redis')->get($phone);
-        if($code!==$code1){
-            return response('Internal Server Error',500);
-        }
+        $code1 = Cache::store('redis')->get($phone);
+        if($code !== $code1) return response('Internal Server Error',500);
+
         //验证通过，注册用户
-        $token=$this->addUser($phone);
+        $token = $this->addUser($phone);
         Cache::store('redis')->set($phone,null);
         return $token;
     }
@@ -101,10 +93,10 @@ class Login
      * @return false|string|\think\Response     返回添加之后生成的token
      */
     private function addUser(string $phone){
-        $user=new User();
-        $uid=$user->insertGetId(['account_num'=>$phone]);
+        $user = new User();
+        $uid = $user->insertGetId(['account_num'=>$phone]);
 
-        $token=$this->getToken(intval($uid));
+        $token = $this->getToken(intval($uid));
         return $token;
     }
 
@@ -115,19 +107,19 @@ class Login
      */
     public function sendCode(Request $request)
     {
-        $code=rand(1000,9999);
-        $arr=$request->post();
-        $phone=$arr['phone'];
+        $code = rand(1000,9999);
+        $arr = $request->post();
+        $phone = $arr['phone'];
         Cache::store('redis')->set($phone,1234);
-        $arr=[
+        $arr = [
             'msg'=>'发送成功',
             'code'=>200
         ];
         return json_encode($arr);
-        $reg="#^1[3456789]\d{9}$#";
-        if(!$phone || !preg_match($reg,$phone)){
-            return response('Internal Server Error',500);
-        }
+
+        $reg = "#^1[3456789]\d{9}$#";
+        if(!$phone || !preg_match($reg,$phone)) return response('Internal Server Error',500);
+
         Cache::store('redis')->set($phone,$code);
         $host = "https://dxyzm.market.alicloudapi.com";
         $path = "/chuangxin/dxjk";
@@ -140,7 +132,6 @@ class Login
         $url = $host . $path . "?" . $querys;
 
         $res=$this->http_curl($method,$url,$headers,$host);
-//        var_dump($res);
         return $res;
     }
 
@@ -156,22 +147,25 @@ class Login
     private function http_curl(string $method,string $url,array $headers,string $host)
     {
         $curl = curl_init();
-        curl_setopt($curl, CURLOPT_CUSTOMREQUEST, $method);
-        curl_setopt($curl, CURLOPT_URL, $url);
-        curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
-        curl_setopt($curl, CURLOPT_FAILONERROR, false);
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($curl, CURLOPT_HEADER, true);
-        if (1 == strpos("$".$host, "https://"))
-        {
-            curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt_array($curl,[
+            CURLOPT_CUSTOMREQUEST => $method,
+            CURLOPT_URL => $url,
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_FAILONERROR => false,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HEADER => true
+        ]);
+
+        if(1 == strpos("$".$host, "https://")){
+            curl_setopt_array($curl,[
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => false
+            ]);
         }
         curl_exec($curl);
         $res=curl_getinfo($curl,CURLINFO_HTTP_CODE);
-        if($res==200){
-            return true;
-        }
+
+        if($res == 200) return true;
         return false;
     }
 
@@ -182,9 +176,8 @@ class Login
      */
     private function getToken(int $uid){
         $key=Env::get('jwt.jwt_key', '');
-        if(!$key){
-            return response('Internal Server Error',500);
-        }
+        if(!$key) return response('Internal Server Error',500);
+
         $token = [
             "iss"=>"",  //签发者 可以为空
             "aud"=>"", //面象的用户，可以为空
